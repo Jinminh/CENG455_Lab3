@@ -21,13 +21,14 @@ uint32_t dd_return_overdue_list(task_list **list);
 void dd_init();
 void delay(int val);
 int generateRandom(int l, int u);
+void report_statistics(int test_id, int n_total_tasks);
 
 /*linked list functions*/
 bool isEmpty(task_list *head);
 int length(task_list** head);
 void displayForward(task_list *head);
 void insert(task_list** head, task_list** last, uint32_t tid, uint32_t deadline, uint32_t creation_time);
-void delete(task_list** head, task_list** last, uint32_t tid,uint32_t creation_time);
+void delete(task_list** head, task_list** last, uint32_t tid);
 void schedule_task(_task_id tid);
 
 #endif /* SOURCES_ACCESS_FUNCTIONS_H_ */
