@@ -108,7 +108,7 @@ void ddScheduler(os_task_param_t task_init_data)
 	// converts timeout value from milliseconds to seconds
 	  // _msgq_receive timeout parameter cannot be 0 or less than 0
 	  if(global_timeout <= 0){
-		  time_out = 10;
+		  time_out = 1;
 	  }else{
 		  time_out = global_timeout*1000;
 	  }
@@ -140,10 +140,25 @@ void ddScheduler(os_task_param_t task_init_data)
 			  printf("\nACTIVE LIST --------- ");
 			  displayForward(dd_active_list_head);
 			  _msg_free(dd_msg_ptr);
+		  }else if(dd_msg_ptr->HEADER.SOURCE_QID == dd_return_active_list_qid){
+			  dd_msg_ptr->HEADER.SOURCE_QID = dd_qid;
+			  dd_msg_ptr->HEADER.TARGET_QID = _msgq_get_id(0, ACTIVE_QUEUE);
+			  dd_msg_ptr->t_list = &dd_active_list_head;
+
+			  _msgq_send(dd_msg_ptr);
+		  }else if(dd_msg_ptr->HEADER.SOURCE_QID == dd_return_overdue_list_qid){
+			  dd_msg_ptr->HEADER.SOURCE_QID = dd_qid;
+			  dd_msg_ptr->HEADER.TARGET_QID = _msgq_get_id(0, OVERDUE_QUEUE);
+			  dd_msg_ptr->t_list = &dd_overdue_list_head;
+
+			  _msgq_send(dd_msg_ptr);
 		  }
+
+
+
 		  // if task was preempted, schedule new task
 		  if(running_task != dd_active_list_head->tid){
-				schedule_task(dd_active_list_head->tid);
+			schedule_task(dd_active_list_head->tid);
 		  }
 
 		  // update timeout
@@ -239,7 +254,7 @@ void Creator_task(os_task_param_t task_init_data)
 	int arrive_t = 0;
 	int time_interval;
 	srand(_time_get_nanoseconds());
-
+	int n_total_tasks = 0;
 	_mqx_uint old_priority;
 	_mqx_uint new_priority = 10;
 
@@ -253,23 +268,190 @@ void Creator_task(os_task_param_t task_init_data)
 #ifdef PEX_USE_RTOS
   while (1) {
 #endif
+	  /*test without aperiodic tasks*/
+//	  if(test_id == 0){
+//		  test_id++;
+//		  int n_total_tasks = 4;
+//		  printf("RUNNING TEST %d\n", test_id);
+//		  dd_tcreate(TASK1_TASK,5,1);
+//		  dd_tcreate(TASK2_TASK,5,1);
+//		  dd_tcreate(TASK3_TASK,5,1);
+//		  dd_tcreate(TASK4_TASK,5,1);
+//		  printf("TASK GENERATOR: %d tasks created.\n\r", n_total_tasks);
+//		  _time_delay(5000);
+//		  printf("\nTASK GENERATOR TEST %d EXPECTED: %d failed, %d completed, %d running\n", test_id, 0, 4, 0);
+//		  report_statistics(test_id, 4);
+//	  }
+//	    // FLUSH SCHEDULER: feasible, collect in middle and end
+//	    _time_delay(5000);
+//
+//	  if(test_id == 1){
+//		  _time_get_elapsed(&start_t);
+//		  int current_time = start_t.SECONDS;
+//		  test_id++;
+//		  int n_total_tasks = 4;
+//		  printf("RUNNING TEST %d\n", test_id);
+//		  dd_tcreate(TASK1_TASK,current_time+5,1);
+//		  dd_tcreate(TASK2_TASK,current_time+15,1);
+//		  dd_tcreate(TASK3_TASK,current_time+5,1);
+//		  dd_tcreate(TASK4_TASK,current_time+5,1);
+//		  printf("TASK GENERATOR: %d tasks created.\n\r", n_total_tasks);
+//		  // WAIT FOR CERTAIN TIME
+//		  _time_delay(2500);
+//		  printf("TASK GENERATOR TEST %d EXPECTED: %d failed, %d completed, %d running\n", test_id, 0, 2, 2);
+//		  // REPORT STATISTICS
+//		  report_statistics(test_id, n_total_tasks);
+//		  // WAIT FOR CERTAIN TIME
+//		  _time_delay(2500);
+//		  printf("TASK GENERATOR TEST %d EXPECTED: %d failed, %d completed, %d running\n", test_id, 0, 4, 0);
+//		  // REPORT STATISTICS
+//		  report_statistics(test_id, n_total_tasks);
+//		  // TEST ENDS
+//
+//	  }
+//
+//	  // FLUSH SCHEDULER: not feasible
+//	    _time_delay(5000);
+//	    // starts at time 20
+//	  if(test_id == 2){
+//		  _time_get_elapsed(&start_t);
+//		  int current_time = start_t.SECONDS;
+//		  test_id++;
+//		  int n_total_tasks = 4;
+//		  printf("RUNNING TEST %d\n", test_id);
+//		  dd_tcreate(TASK1_TASK,current_time+2,1);
+//		  dd_tcreate(TASK2_TASK,current_time+3,1);
+//		  dd_tcreate(TASK3_TASK,current_time+3,1);
+//		  dd_tcreate(TASK4_TASK,current_time+3,1);
+//		  printf("TASK GENERATOR: %d tasks created.\n\r", n_total_tasks);
+//		  // WAIT FOR CERTAIN TIME
+//		  _time_delay(5000);
+//		  printf("TASK GENERATOR TEST %d EXPECTED: %d failed, %d completed, %d running\n", test_id, 1, 3, 0);
+//		  // REPORT STATISTICS
+//		  report_statistics(test_id, n_total_tasks);
+//
+//	  }
+//
+//	  // FLUSH SCHEDULER: not feasible
+//	    _time_delay(5000);
+//
+//	    // starts at time 30
+//	  if(test_id == 3){
+//		  _time_get_elapsed(&start_t);
+//		  int current_time = start_t.SECONDS;
+//		  test_id++;
+//		  int n_total_tasks = 4;
+//		  printf("RUNNING TEST %d\n", test_id);
+//		  dd_tcreate(TASK1_TASK,current_time+5,2);
+//		  dd_tcreate(TASK2_TASK,current_time+5,1);
+//		   _time_delay(1000);
+//		  _time_get_elapsed(&start_t);
+//		  current_time = start_t.SECONDS;
+//		  dd_tcreate(TASK3_TASK,current_time+2,1);
+//		  dd_tcreate(TASK4_TASK,current_time+5,1);
+//		  printf("TASK GENERATOR: %d tasks created.\n\r", n_total_tasks);
+//		  // WAIT FOR CERTAIN TIME
+//		  _time_delay(4500);
+//		  printf("TASK GENERATOR TEST %d EXPECTED: %d failed, %d completed, %d running\n", test_id, 0, 4, 0);
+//		  // REPORT STATISTICS
+//		  report_statistics(test_id, n_total_tasks);
+//	  }
+//	  _time_delay(5000);
+//	  // starts at time 46
+//
+//
+//	  if(test_id == 4){
+//		  _time_get_elapsed(&start_t);
+//		  int current_time = start_t.SECONDS;
+//		  test_id++;
+//		  int n_total_tasks = 4;
+//		  printf("RUNNING TEST %d\n", test_id);
+//
+//		  dd_tcreate(TASK1_TASK,current_time+3,2);
+//		  dd_tcreate(TASK2_TASK,current_time+3,1);
+//		  _time_delay(2000);
+//		  _time_get_elapsed(&start_t);
+//		  current_time = start_t.SECONDS;
+//		  dd_tcreate(TASK3_TASK,current_time+1,1);
+//		  dd_tcreate(TASK4_TASK,current_time+4,1);
+//		  printf("TASK GENERATOR: %d tasks created.\n\r", n_total_tasks);
+//		  // WAIT FOR CERTAIN TIME
+//		  _time_delay(4500);
+//		  printf("TASK GENERATOR TEST %d EXPECTED: %d failed, %d completed, %d running\n", test_id, 1, 3, 0);
+//		  // REPORT STATISTICS
+//		  report_statistics(test_id, n_total_tasks);
+//	  }
+//	  _time_delay(5000);
+//
+//
+//	  if(test_id == 5){
+//		  _time_get_elapsed(&start_t);
+//		  int current_time = start_t.SECONDS;
+//		  test_id++;
+//		  int n_total_tasks = 4;
+//		  printf("RUNNING TEST %d\n", test_id);
+//
+//		  dd_tcreate(TASK1_TASK,current_time+3,2);
+//		  dd_tcreate(TASK2_TASK,current_time+3,2);
+//		  dd_tcreate(TASK3_TASK,current_time+5,1);
+//		  printf("TASK GENERATOR: %d tasks created.\n\r", n_total_tasks);
+//		  // WAIT FOR CERTAIN TIME
+//		  _time_delay(5000);
+//		  printf("TASK GENERATOR TEST %d EXPECTED: %d failed, %d completed, %d running\n", test_id, 1, 2, 0);
+//		  // REPORT STATISTICS
+//		  report_statistics(test_id, n_total_tasks);
+//		  puts("Generator finished ------------------- \n");
+//		  _task_block();
+//	  }
+//	  _time_delay(5000);
+
+//	  if(test_id == 6){
+//		  _time_get_elapsed(&start_t);
+//		  int current_time = start_t.SECONDS;
+//		  test_id++;
+//		  int n_total_tasks = 80;
+//		  printf("RUNNING TEST %d\n", test_id);
+//		  for(i=0; i<50; ++i){
+//			  dd_tcreate(GIVENTEST_SAMPLETASK_100, 3000);
+//		  }
+//			_time_delay(1000);
+//		  for(i=0; i<30; ++i){
+//			  _task_id t1 = dd_tcreate(GIVENTEST_SAMPLETASK_200, 2000);
+//		  }
+//		  printf("TASK GENERATOR: %d tasks created.\n\r", n_total_tasks);
+//		  // WAIT FOR CERTAIN TIME
+//		  _time_delay(5000);
+//		  printf("TASK GENERATOR TEST %d EXPECTED: %d failed, %d completed, %d running\n", test_id, 1, 2, 0);
+//		  // REPORT STATISTICS
+//		  report_statistics(test_id, n_total_tasks);
+//		  puts("Generator finished ------------------- \n");
+//		  _task_block();
+//	  }
+
 
 	  /*Create periodic tasks*/
 	  if(ptask_num < NUM_PERIODIC_TASKS){
 		 _time_get_elapsed(&start_t);
 		  /*Avoid create several tasks at a same time*/
-		  if(start_t.SECONDS % 10 == 0 && start_t.SECONDS != prev_sec){
+		  if(start_t.SECONDS % 1 == 0 && start_t.SECONDS != prev_sec){
 			  prev_sec = start_t.SECONDS;
-			  if(ptask_num == 0)
-			  	  dd_tcreate(TASK1_TASK,10,5);
-			  else if(ptask_num == 1)
-				  dd_tcreate(TASK2_TASK,15,10);
-			  else if(ptask_num == 2)
-				  dd_tcreate(TASK3_TASK,35,5);
-			  else if(ptask_num == 3)
-				  dd_tcreate(TASK4_TASK,48,15);
-			  else if(ptask_num == 4)
-				  dd_tcreate(TASK5_TASK,55,20);
+			  if(ptask_num == 0){
+//				  dd_tcreate(TASK1_TASK,10,5);
+			  }
+			  else if(ptask_num == 1) {
+//				  dd_tcreate(TASK2_TASK,10,8);
+			  }
+			  else if(ptask_num == 2){
+//				  dd_tcreate(TASK3_TASK,7,8);
+			  }
+
+			  else if(ptask_num == 3){
+//				  dd_tcreate(TASK4_TASK,10,8);
+			  }
+			  else if(ptask_num == 4){
+//				  dd_tcreate(TASK5_TASK,15,8);
+			  }
+
 
 			  ptask_num++;
 		  }
@@ -278,18 +460,22 @@ void Creator_task(os_task_param_t task_init_data)
 	  if(aptask_num < NUM_APERIODIC_TASKS){
 			  /*get current time*/
 			 _time_get_elapsed(&start_t);
-			  time_interval = generateRandom(8, 15);
+			  time_interval = generateRandom(5, 25);
 			  if(start_t.SECONDS % time_interval == 0 && start_t.SECONDS != prev_sec){
 			  /*Avoid create several tasks at a same time*/
 				  /*set the arrival time for next task */
 				  printf("CREATING APERIODIC TASK%d \n",aptask_num+1);
 				  prev_sec = start_t.SECONDS;
-				  int deadline = prev_sec+generateRandom(15, 30);
-				  int execution_time = generateRandom(8, 21);
+				  int deadline = prev_sec+generateRandom(5, 15);
+				  int execution_time = generateRandom(3, 15);
 				  dd_tcreate(TASK6_TASK, deadline, execution_time);
 				  aptask_num++;
+				  report_statistics(test_id, ptask_num+aptask_num);
+
 			  }
 	  }
+
+
 
 	if(ptask_num >= NUM_PERIODIC_TASKS && aptask_num >= NUM_APERIODIC_TASKS){
 	  puts("Generator finished ------------------- \n");
@@ -521,6 +707,11 @@ void Task_Moniter(os_task_param_t task_init_data)
   /* Write your local variable definition here */
 	_mqx_uint old_priority;
 	_mqx_uint new_priority = 19;
+	_time_delay(1500);
+
+	test_id++;
+
+	report_statistics(test_id, NUM_APERIODIC_TASKS+NUM_PERIODIC_TASKS);
 
 	// change priority of the running task to 16
 	if(_task_get_priority(_task_get_id(), &old_priority) != MQX_OK)
