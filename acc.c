@@ -29,7 +29,7 @@ _task_id dd_tcreate(uint32_t template_index, uint32_t deadline, uint32_t executi
 
 	msg_ptr->HEADER.SOURCE_QID = tcreate_qid;
 	msg_ptr->HEADER.TARGET_QID = _msgq_get_id(0, DD_QUEUE);
-	msg_ptr->HEADER.SIZE = sizeof(MESSAGE_HEADER_STRUCT) + sizeof(int)*4;
+	msg_ptr->HEADER.SIZE = sizeof(MESSAGE_HEADER_STRUCT) + sizeof(int)*4 + sizeof(task_list);
 	msg_ptr->tid = new_tid;
 	msg_ptr->deadline = deadline;
 	msg_ptr->creation_time = start_t.SECONDS;
@@ -67,7 +67,7 @@ uint32_t dd_delete(_task_id task_id, uint32_t creation_time){
 	}
 	msg_ptr->HEADER.SOURCE_QID = delete_qid;
 	msg_ptr->HEADER.TARGET_QID = _msgq_get_id(0, DD_QUEUE);
-	msg_ptr->HEADER.SIZE = sizeof(MESSAGE_HEADER_STRUCT) + sizeof(int)*4;
+	msg_ptr->HEADER.SIZE = sizeof(MESSAGE_HEADER_STRUCT) + sizeof(int)*4+sizeof(task_list);
 	msg_ptr->tid = task_id;
 	msg_ptr->deadline = 0;
 	msg_ptr->creation_time = creation_time;
@@ -79,11 +79,47 @@ uint32_t dd_delete(_task_id task_id, uint32_t creation_time){
 }
 
 uint32_t dd_return_active_list(task_list **list){
-	return *list;
+	MSG_PTR msg_ptr = (MSG_PTR)_msg_alloc(msg_pool);
+	dd_return_active_list_qid = _msgq_open(ACTIVE_QUEUE, 0);
+
+	msg_ptr->HEADER.SOURCE_QID = dd_return_active_list_qid;
+	msg_ptr->HEADER.TARGET_QID = _msgq_get_id(0, DD_QUEUE);
+	msg_ptr->HEADER.SIZE = sizeof(MESSAGE_HEADER_STRUCT) + sizeof(int)*4+sizeof(task_list);
+
+	_msgq_send(msg_ptr);
+
+	msg_ptr = _msgq_receive(dd_return_active_list_qid, 0);
+
+	if(msg_ptr != NULL){
+//		puts("\n active>>>>>>i received!\n");
+		*list = msg_ptr->t_list;
+		_msgq_close(dd_return_active_list_qid);
+		_msg_free(msg_ptr);
+		return 1;
+	}
+
+	return 0;
 }
 
 uint32_t dd_return_overdue_list(task_list **list){
-	return *list;
+	MSG_PTR msg_ptr = (MSG_PTR)_msg_alloc(msg_pool);
+	dd_return_overdue_list_qid = _msgq_open(OVERDUE_QUEUE, 0);
+
+	msg_ptr->HEADER.SOURCE_QID = dd_return_overdue_list_qid;
+	msg_ptr->HEADER.TARGET_QID = _msgq_get_id(0, DD_QUEUE);
+	msg_ptr->HEADER.SIZE = sizeof(MESSAGE_HEADER_STRUCT) + sizeof(int)*4+sizeof(task_list);
+
+	_msgq_send(msg_ptr);
+	msg_ptr = _msgq_receive(dd_return_overdue_list_qid, 0);
+
+	if(msg_ptr != NULL){
+//		puts("\n active>>>>>>i received!\n");
+		*list = msg_ptr->t_list;
+		_msgq_close(dd_return_overdue_list_qid);
+		_msg_free(msg_ptr);
+		return 1;
+	}
+	return 0;
 }
 
 void dd_init(){
@@ -123,6 +159,17 @@ void displayForward(task_list* head) {
    printf("]\n\n");
 }
 
+int length(task_list **head){
+	   int length = 0;
+	   task_list *current;
+
+	   for(current = *head; current != NULL; current = current->next_cell){
+	      length++;
+	   }
+
+	   return length;
+}
+
 
 // adds to list and sorts the list
 void insert(task_list** head, task_list** last, uint32_t tid, uint32_t deadline, uint32_t creation_time) {
@@ -146,7 +193,7 @@ void insert(task_list** head, task_list** last, uint32_t tid, uint32_t deadline,
    int i = 0;
 
    // uses bubble sort to sort the list
-   while(current->deadline < deadline){
+   while(current->deadline <= deadline){
 	   /*if it is last node*/
 	   if(current->next_cell == NULL){
 		   break;
@@ -156,6 +203,7 @@ void insert(task_list** head, task_list** last, uint32_t tid, uint32_t deadline,
    }
 
    delay(100);
+
    if(current == *last){
 	   /*insert new node into the tail of the list*/
 	   if((current)->deadline <= deadline){
@@ -289,6 +337,26 @@ void schedule_task(_task_id tid)
 
 }
 
+void report_statistics(int test_id, int n_total_tasks){
+	task_list* active_tasks_head_ptr = NULL;
+	task_list* overdue_tasks_head_ptr = NULL;
+
+
+    if(!dd_return_active_list(&active_tasks_head_ptr) || !dd_return_overdue_list(&overdue_tasks_head_ptr)){
+        printf("error: failed to obtain the tasks list!\n\r");
+        return 1;
+    }
+
+    int n_completed_tasks = 0;
+    int n_failed_tasks = length(overdue_tasks_head_ptr);
+    int n_running_tasks = length(active_tasks_head_ptr);
+
+
+
+    n_completed_tasks = n_total_tasks-(n_failed_tasks+n_running_tasks);
+    delay(100);
+    printf("\n\n{ TASK GENERATOR TEST %d: %d failed, %d completed, %d still running. }\n\n", test_id, n_failed_tasks, n_completed_tasks, n_running_tasks);
+}
 
 
 
